@@ -8,7 +8,7 @@
         :root {
             --bg: #121212;
             --surface: #1e1e1e;
-            --primary: #bb86fc;
+            --primary: #fe0000;
             --text: #e0e0e0;
             --text-muted: #a0a0a0;
         }
@@ -31,6 +31,9 @@
             width: 90%;
             text-align: center;
         }
+        a {
+            color: darkgrey;
+        }
         h1 {
             font-size: 1.6rem;
             margin-bottom: 0.5rem;
@@ -43,7 +46,7 @@
         }
         .btn {
             background-color: var(--primary);
-            color: #000;
+            color: var(--text);
             border: none;
             padding: 12px 20px;
             border-radius: 8px;
@@ -137,6 +140,10 @@
         <div id="result-section">
             <p style="margin-bottom: 10px; font-weight: 500;">Your link is ready:</p>
             <a id="youtube-link" class="result-link" href="#" target="_blank">Open in YouTube</a>
+        </div>
+
+        <div>
+            <a style="font-size: 12px" target="_blank" href="https://github.com/famiclone/yrb">Github</a>
         </div>
     </div>
 
