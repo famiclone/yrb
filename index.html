@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube's Recycle Bin Explorer</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --primary: #bb86fc;
+            --text: #e0e0e0;
+            --text-muted: #a0a0a0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: var(--surface);
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.6rem;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+        p.subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+        .btn {
+            background-color: var(--primary);
+            color: #000;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: 600;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .mode-selection {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 1rem;
+        }
+        @media (min-width: 400px) {
+            .mode-selection {
+                flex-direction: row;
+                justify-content: center;
+            }
+        }
+        #manual-section, #result-section {
+            display: none;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #333;
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            background: #2a2a2a;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            outline: none;
+            box-sizing: border-box;
+        }
+        select:focus {
+            border-color: var(--primary);
+        }
+        .result-link {
+            display: inline-block;
+            margin-top: 1rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 1.1rem;
+            word-break: break-all;
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            transition: border-color 0.2s;
+        }
+        .result-link:hover {
+            border-color: var(--primary);
+        }
+        .count-badge {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: block;
+            margin-top: -15px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>YouTube's Recycle Bin</h1>
+        <br/>
+        <span class="count-badge" id="pattern-count">Loading patterns...</span>
+        <br/>
+
+        <div class="mode-selection">
+            <button class="btn" onclick="setMode('manual')">Manual Mode</button>
+            <button class="btn" onclick="setMode('auto')">Automatic (Random)</button>
+        </div>
+
+        <div id="manual-section">
+            <select id="pattern-select"></select>
+            <button class="btn" onclick="generateManual()" style="width: 100%;">Generate Link</button>
+        </div>
+
+        <div id="result-section">
+            <p style="margin-bottom: 10px; font-weight: 500;">Your link is ready:</p>
+            <a id="youtube-link" class="result-link" href="#" target="_blank">Open in YouTube</a>
+        </div>
+    </div>
+
+    <script>
+        const patterns = [
+            { name: "IMG XXXX (0000-9999)", template: "IMG {4}" },
+            { name: "MVI XXXX (Camera)", template: "MVI {4}" },
+            { name: "MOV XXXX (Camera)", template: "MOV {4}" },
+            { name: "100 XXXX (Camera)", template: "100 {4}" },
+            { name: "SAM XXXX (Camera)", template: "SAM {4}" },
+            { name: "DSC XXXX (Camera)", template: "DSC {4}" },
+            { name: "SDV XXXX (Camera)", template: "SDV {4}" },
+            { name: "DSCFXXXX (Camera)", template: "DSCF{4}" },
+            { name: "DSCNXXXX (Camera)", template: "DSCN{4}" },
+            
+            { name: "WIN YYYYMMDD", template: "WIN {date}" },
+            { name: "VID YYYYMMDD", template: "VID {date}" },
+            { name: "Capture YYYYMMDD", template: "Capture {date}" },
+            { name: "InShot YYYYMMDD", template: "InShot {date}" },
+            { name: "PXL YYYYMMDD", template: "PXL {date}" },
+            { name: "AUD-YYYYMMDD", template: "AUD-{date}" },
+            { name: "240p 400k", template: "240p 400k" },
+            { name: "480p 600k", template: "480p 600k" },
+            { name: "480p 2000k", template: "480p 2000k" },
+            { name: "720p 1500k", template: "720p 1500k" },
+            { name: "720p 4000k", template: "720p 4000k" },
+            { name: "Clips4Sale", template: "Clips4Sale" },
+            { name: "WhatsApp Video YYYY MM DD", template: "WhatsApp Video {year} {month} {day}" },
+            { name: "Desktop YYYY MM DD", template: "Desktop {year} {month} {day}" },
+            { name: "\"Axon Body * Video\"", template: "Axon Body * Video" },
+            { name: "WP YYYYMMDD", template: "WP {date}" },
+            { name: "\"Video YYYYMMDD\"", template: "Video {date}" },
+            { name: "KakaoTalk Video YYYY MM", template: "KakaoTalk Video {year} {month}" },
+            { name: "AVSEQXX", template: "AVSEQ{2}" },
+            { name: "AVSEQXX.DAT", template: "AVSEQ{2}.DAT" },
+            { name: "MOVIXXXX", template: "MOVI{4}" },
+            { name: "GMTYYYYMMDD", template: "GMT{date}" },
+
+            { name: "SVM AXXXX", template: "SVM A{4}" },
+            { name: "KVIDXXXX", template: "KVID{4}" },
+            { name: "\"My Videolicious Video\"", template: "My Videolicious Video" },
+            { name: "M2U0XXXX", template: "M2U0{4}" },
+            { name: "GH01XXXX", template: "GH01{4}" },
+            { name: "\"Month DD, YYYY\"", template: "{monthName} {daySingular}, {year}" },
+            { name: "MAH0XXXX", template: "MAH0{4}" },
+            { name: "CIMGXXXX", template: "CIMG{4}" },
+            { name: "IMGPXXXX", template: "IMGP{4}" },
+            { name: "VideoXXXX", template: "Video{4}" },
+            { name: "MOV0XXXX", template: "MOV0{4}" },
+            { name: "MUSIC0X.DAT", template: "MUSIC0{1}.DAT" },
+            { name: "REC XXXX", template: "REC {4}" },
+            { name: "AVI00XXX", template: "AVI00{3}" },
+            { name: "AVI 0XXX", template: "AVI 0{3}" },
+            { name: "4XXX", template: "4{3}" },
+            { name: "Trim 4XXX", template: "Trim 4{3}" },
+            { name: "Copy 4XXX", template: "Copy 4{3}" },
+            { name: "Video 4XXX", template: "Video 4{3}" },
+            { name: "M4H0XXXX", template: "M4H0{4}" },
+            { name: "M4V0XXXX", template: "M4V0{4}" },
+
+            { name: "SDC1XXXX", template: "SDC1{4}" },
+            { name: "SANYXXXX", template: "SANY{4}" },
+            { name: "HPIMXXXX", template: "HPIM{4}" },
+            { name: "GEDCXXXX", template: "GEDC{4}" },
+            { name: "XXXX.mp4", template: "{4}.mp4" },
+            { name: "VID0XXXX", template: "VID0{4}" },
+            { name: "DSC 0XXXX", template: "DSC 0{4}" },
+            { name: "CAM0XXXX", template: "CAM0{4}" },
+            { name: "AMBAXXXX", template: "AMBA{4}" },
+            { name: "HDV XXXX", template: "HDV {4}" },
+            { name: "DSCIXXXX", template: "DSCI{4}" },
+            { name: "SNV3XXXX", template: "SNV3{4}" },
+            { name: "MOVXXXXA", template: "MOV{4}A" },
+            { name: "Zi6 XXXX", template: "Zi6 {4}" },
+            { name: "ClipXXXX", template: "Clip{4}" },
+            { name: "YDXJXXXX", template: "YDXJ{4}" },
+            { name: "0XXXX.MTS", template: "0{4}.MTS" },
+            { name: "SSPXXXXX", template: "SSPX{4}" },
+            { name: "00XXXXA", template: "00{4}A" },
+            { name: "IMAGXXXX", template: "IMAG{4}" },
+            { name: "CXXXX", template: "C{4}" },
+
+            { name: "SUNPXXXX", template: "SUNP{4}" },
+            { name: "Picture XXX", template: "Picture {3}" },
+            { name: "PC10XXXX", template: "PC10{4}" },
+            { name: "PTDCXXXX", template: "PTDC{4}" },
+            { name: "ВидеоXXXX", template: "Видео{4}" },
+            { name: "VCLPXXXX", template: "VCLP{4}" },
+            { name: "FHDXXXX", template: "FHD{4}" },
+            { name: "Moto_0XXX", template: "Moto_0{3}" },
+            { name: "WEB_0XXX", template: "WEB_0{3}" },
+            { name: "P1XX0XXX", template: "P1{2}0{3}" },
+            { name: "im000XXX", template: "im000{3}" },
+            { name: "ZOOM0XXX", template: "ZOOM0{3}" },
+            { name: "SV A0XXX", template: "SV A0{3}" },
+            { name: "Videoplayback XXX", template: "Videoplayback {3}" },
+            { name: "GEDV0XXX", template: "GEDV0{3}" },
+            { name: "\"0001 0XXX\"", template: "0001 0{3}" },
+            { name: "ACTP0XXX", template: "ACTP0{3}" },
+            { name: "PAXX0XXX", template: "PA{2}0{3}" },
+            { name: "PBXX0XXX", template: "PB{2}0{3}" },
+            { name: "IM000XXX", template: "IM000{3}" },
+            { name: "MAV 0XXX", template: "MAV 0{3}" },
+            { name: "MOVIE 0XXX", template: "MOVIE 0{3}" },
+
+            { name: "ANMR0XXX", template: "ANMR0{3}" },
+            { name: "Snímek XXX", template: "Snímek {3}" },
+            { name: "DIGI0XXX", template: "DIGI0{3}" },
+            { name: "ASF 0XXX", template: "ASF 0{3}" },
+            { name: "VXX0XXX", template: "V{2}0{3}" },
+            { name: "IONX0XXX", template: "IONX0{3}" },
+            { name: "VICO0XXX", template: "VICO0{3}" },
+            { name: "ArcSoft VideoXXX", template: "ArcSoft Video{3}" },
+            { name: "PRMS0XXX", template: "PRMS0{3}" },
+            { name: "SMOV0XXX", template: "SMOV0{3}" },
+            { name: "RCA 0XXX", template: "RCA 0{3}" },
+            { name: "MOVA0XXX", template: "MOVA0{3}" },
+            { name: "\"Sequence XXX\"", template: "Sequence {3}" },
+            { name: "WideoXXX", template: "Wideo{3}" },
+            { name: "MAX 0XXX", template: "MAX 0{3}" },
+            { name: "MDGC0XXX", template: "MDGC0{3}" },
+            { name: "PCDV0XXX", template: "PCDV0{3}" },
+            { name: "HD0 0XXX", template: "HD0 0{3}" },
+            { name: "\"Filmato 0XXX\"", template: "Filmato 0{3}" },
+            { name: "\"Il mio filmato X\"", template: "Il mio filmato {1}" },
+            { name: "LOOP0XXX", template: "LOOP0{3}" },
+
+            { name: "SMDC0XXX", template: "SMDC0{3}" },
+            { name: "HUNT0XXX", template: "HUNT0{3}" },
+            { name: "ACXS0XXX", template: "ACXS0{3}" },
+            { name: "MVC XXXV", template: "MVC {3}V" },
+            { name: "MA0 00XX", template: "MA0 00{2}" },
+            { name: "MMF00XX", template: "MMF00{2}" },
+            { name: "G01000XX", template: "G01000{2}" },
+            { name: "PCXX00XX", template: "PC{2}00{2}" },
+            { name: "\"Sequence XX X\"", template: "Sequence {2} {1}" },
+            { name: "\"My Project X\"", template: "My Project {1}" },
+            { name: "Kazam Screencast 000XX", template: "Kazam Screencast 000{2}" },
+            { name: "CADDX0000XX", template: "CADDX0000{2}" },
+            { name: "ZOE 00XX", template: "ZOE 00{2}" },
+            { name: "\"Video_ts.vob\"", template: "Video_ts.vob" },
+            { name: "\"MicrosoftTeams Video\"", template: "MicrosoftTeams Video" },
+            { name: "\"Axon Flex Video\"", template: "Axon Flex Video" },
+            { name: "\"Test upload\"", template: "Test upload" },
+            { name: "\"Moviemakeronline com\"", template: "Moviemakeronline com" },
+            { name: "\"myvideo convert2video com\"", template: "myvideo convert2video com" },
+            { name: "\"Myvideo imagetovideo com\"", template: "Myvideo imagetovideo com" },
+            { name: "\"I created this video with the YouTube Slideshow Creator\"", template: "I created this video with the YouTube Slideshow Creator" },
+
+            { name: "\"I created this video with the YouTube Video Editor\"", template: "I created this video with the YouTube Video Editor" },
+            { name: "\"Sent from my blackberry smartphone\"", template: "Sent from my blackberry smartphone" },
+            { name: "\"Video from Tweetcaster\"", template: "Video from Tweetcaster" },
+            { name: "\"My Ezvid Video\"", template: "My Ezvid Video" },
+            { name: "\"This video was uploaded from an Android phone\"", template: "This video was uploaded from an Android phone" },
+            { name: "\".VOB\"", template: ".VOB" },
+            { name: "\"копия видео\"", template: "копия видео" },
+            { name: "\"копия видео Копия видео\"", template: "копия видео Копия видео" },
+            { name: "\"Sprint PictureMail\"", template: "Sprint PictureMail" },
+            { name: "\"Temp video for share\"", template: "Temp video for share" },
+            { name: "\"My stop motion movie\"", template: "My stop motion movie" },
+            { name: "\"XiaoYing video\"", template: "XiaoYing video" },
+            { name: "\"Dvgrab\"", template: "Dvgrab" },
+            { name: "\"Stop motion.avi\"", template: "Stop motion.avi" },
+            { name: "\"QuickCapture Video - Month D, YYYY\"", template: "QuickCapture Video - {monthName} {daySingular}, {year}" },
+            { name: "Webcam YYYYMMDD", template: "Webcam {date}" },
+            { name: "Webcam Recorded Video - Month D, YYYY", template: "Webcam Recorded Video - {monthName} {daySingular}, {year}" },
+            { name: "Webcam video Month D, YYYY", template: "Webcam video {monthName} {daySingular}, {year}" },
+            { name: "\"Project of DD Mth 2011 PDT\"", template: "Project of {daySingular} {monthShort} 2011 PDT" },
+            { name: "Webcam video from Month D, YYYY", template: "Webcam video from {monthName} {daySingular}, {year}" },
+            { name: "SCR YYYYMMDD", template: "SCR {date}" },
+
+            { name: "Flipagram Month YYYY", template: "Flipagram {monthName} {year}" },
+            { name: "Iw3mp YYYYMMDD", template: "Iw3mp {date}" },
+            { name: "\"AR.Drone 2.0 Video: YYYY\"", template: "AR.Drone 2.0 Video: {year}" },
+            { name: "WA VID YYYYMMDD", template: "WA VID {date}" },
+            { name: "XRecorder DDMMYYYY", template: "XRecorder {day}{month}{year}" },
+            { name: "CODWAWMP YYYY MM DD", template: "CODWAWMP {year} {month} {day}" },
+            { name: "HI2 YYYY MM DD", template: "HI2 {year} {month} {day}" },
+            { name: "Grand Theft Auto 5 YYYY MM DD", template: "Grand Theft Auto 5 {year} {month} {day}" },
+            { name: "Javaw YYYY MM DD", template: "Javaw {year} {month} {day}" },
+            { name: "Chrome YYYY MM DD", template: "Chrome {year} {month} {day}" },
+            { name: "Bandicam YYYY MM DD", template: "Bandicam {year} {month} {day}" },
+            { name: "Screen Recording YYYY MM DD", template: "Screen Recording {year} {month} {day}" },
+            { name: "YouCut YYYYMMDD", template: "YouCut {date}" },
+            { name: "Km YYYYMMDD", template: "Km {date}" },
+            { name: "Simplescreenrecorder YYYY MM DD", template: "Simplescreenrecorder {year} {month} {day}" },
+            { name: "720p YYMMDD", template: "720p {shortYear}{month}{day}" },
+            { name: "XRecorder YYYYMMDD", template: "XRecorder {date}" },
+
+            // low-view
+            { name: "You have new picture mail! (video)", template: "Phone" },
+            { name: "Media.3gp", template: "Media.3gp" },
+            { name: "Media.3g2", template: "Media.3g2" },
+            { name: "Video.3g2", template: "Video.3g2" },
+            { name: "New Multimedia Message", template: "New Multimedia Message" },
+            { name: "Multimedia Message", template: "Multimedia Message" },
+            { name: "Video from my phone", template: "Video from my phone" },
+            { name: "Video uploaded from my mobile phone", template: "Video uploaded from my mobile phone" },
+            { name: "For Month DD, YYYY", template: "For {monthName} {day}, {year}" },
+            { name: "Recorded on Month DD, YYYY using a Flip Video Camcorder", template: "Recorded on {monthName} {day}, {year} using a Flip Video Camcorder" },
+            { name: "VideoXXXX.3gp", template: "Video{4}.3gp" },
+        ];
+
+        // Update the header badge with the total pattern count
+        document.getElementById('pattern-count').textContent = `Loaded ${patterns.length} search patterns`;
+
+        const selectElement = document.getElementById('pattern-select');
+        patterns.forEach((p, index) => {
+            let option = document.createElement('option');
+            option.value = index;
+            option.textContent = p.name;
+            selectElement.appendChild(option);
+        });
+
+        // Helper function to generate X amount of random digits
+        function getRandomDigits(length) {
+            let res = '';
+            for(let i = 0; i < length; i++) res += Math.floor(Math.random() * 10);
+            return res;
+        }
+
+        function getRandomTimeHHMM() {
+            const hours = String(Math.floor(Math.random() * 24)).padStart(2, '0');
+            const minutes = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+            
+            return `${hours}${minutes}`;
+        }
+
+        // Helper function to generate complex date objects
+        function getRandomDateVars() {
+            // Date between 2004 and today
+            const start = new Date(2004, 0, 1).getTime();
+            const end = new Date().getTime();
+            const date = new Date(start + Math.random() * (end - start));
+            
+            const year = date.getFullYear().toString();
+            const shortYear = year.substring(2); // e.g., 24 for 2024
+            const monthNum = date.getMonth(); // 0 to 11
+            const month = String(monthNum + 1).padStart(2, '0'); // 01 to 12
+            const day = String(date.getDate()).padStart(2, '0'); // 01 to 31
+            const daySingular = date.getDate().toString(); // 1 to 31
+            
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const monthShorts = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            
+            return {
+                year: year,
+                shortYear: shortYear,
+                month: month,
+                day: day,
+                daySingular: daySingular,
+                monthName: monthNames[monthNum],
+                monthShort: monthShorts[monthNum],
+                dateStr: `${year}${month}${day}` // YYYYMMDD
+            };
+        }
+
+        // Core Query Builder 
+        function buildQuery(template) {
+            let query = template;
+            const d = getRandomDateVars();
+
+            // Regex magic: Replace anything like {4}, {2}, {6} with random digits dynamically
+            query = query.replace(/\{(\d+)\}/g, function(match, p1) {
+                return getRandomDigits(parseInt(p1, 10));
+            });
+
+            // Replace complex date formats
+            query = query.replace(/\{date\}/g, d.dateStr);
+            query = query.replace(/\{year\}/g, d.year);
+            query = query.replace(/\{shortYear\}/g, d.shortYear);
+            query = query.replace(/\{month\}/g, d.month);
+            query = query.replace(/\{monthName\}/g, d.monthName);
+            query = query.replace(/\{monthShort\}/g, d.monthShort);
+            query = query.replace(/\{day\}/g, d.day);
+            query = query.replace(/\{daySingular\}/g, d.daySingular);
+            query = query.replace(/\{time\}/g, getRandomTimeHHMM());
+
+            return `"${query}"`; // Quotes for exact match
+        }
+
+        function displayLink(query) {
+            const linkElement = document.getElementById('youtube-link');
+            // sp=CAI%3D is a YouTube system parameter for sorting by Upload Date
+            const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=CAI%253D`;
+            linkElement.href = url;
+            linkElement.textContent = `Search: ${query}`;
+            document.getElementById('result-section').style.display = 'block';
+        }
+
+        function setMode(mode) {
+            document.getElementById('result-section').style.display = 'none';
+            if (mode === 'manual') {
+                document.getElementById('manual-section').style.display = 'block';
+            } else if (mode === 'auto') {
+                document.getElementById('manual-section').style.display = 'none';
+                
+                const randomPattern = patterns[Math.floor(Math.random() * patterns.length)];
+                let query = buildQuery(randomPattern.template);
+                displayLink(query);
+            }
+        }
+
+        function generateManual() {
+            const selectedIndex = document.getElementById('pattern-select').value;
+            const pattern = patterns[selectedIndex];
+            let query = buildQuery(pattern.template);
+            displayLink(query);
+        }
+    </script>
+</body>
+</html>
